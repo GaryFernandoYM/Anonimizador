@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Anonimización de Datasets" }}</title>
+    <meta name="color-scheme" content="dark light" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    {% block extra_head %}{% endblock %}
+    <style>
+        :root {
+            --bg: #0b1022;
+            --card: #0f1530;
+            --text: #e6e9f8;
+            --muted: #9aa3c0;
+            --accent: #7aa2ff;
+            --accent-2: #8ee0d0;
+            --border: #1b2347;
+            --shadow: 0 6px 24px rgba(0, 0, 0, .25);
+        }
+
+        [data-theme="light"] {
+            --bg: #f6f8ff;
+            --card: #ffffff;
+            --text: #0f1530;
+            --muted: #5b6480;
+            --accent: #3057ff;
+            --accent-2: #0ea5a5;
+            --border: #e5e9f2;
+            --shadow: 0 6px 18px rgba(10, 20, 80, .08);
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            height: 100%
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 28px auto;
+            padding: 0 18px
+        }
+
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: saturate(110%) blur(8px);
+            background: color-mix(in oklab, var(--bg), transparent 40%);
+            border-bottom: 1px solid var(--border)
+        }
+
+        .header-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            justify-content: space-between
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .brand-logo {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: var(--shadow)
+        }
+
+        .brand-title {
+            font-weight: 700;
+            letter-spacing: .2px
+        }
+
+        .nav {
+            display: flex;
+            gap: 14px;
+            align-items: center
+        }
+
+        .nav a,
+        .nav button {
+            text-decoration: none;
+            color: var(--text);
+            opacity: .9;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            background: transparent;
+        }
+
+        .nav a:hover,
+        .nav button:hover {
+            border-color: var(--border);
+            opacity: 1
+        }
+
+        .nav .active {
+            background: color-mix(in oklab, var(--accent) 15%, transparent);
+            border-color: color-mix(in oklab, var(--accent) 40%, var(--border))
+        }
+
+        .theme-toggle {
+            cursor: pointer
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+            margin-bottom: 18px;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--border));
+            background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 25%, transparent), transparent);
+            color: var(--text);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .button.secondary {
+            background: transparent;
+            border-color: var(--border);
+            opacity: .95
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: color-mix(in oklab, var(--card), transparent 10%);
+            font-size: 12px
+        }
+
+        .site-footer {
+            border-top: 1px solid var(--border);
+            margin-top: 28px
+        }
+
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--muted);
+            font-size: 14px
+        }
+
+        .fade-in {
+            animation: fade .35s ease-out both
+        }
+
+        @keyframes fade {
+            from {
+                opacity: 0;
+                transform: translateY(6px)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        @media (max-width:680px) {
+            .footer-inner {
+                flex-direction: column;
+                gap: 6px
+            }
+        }
+    </style>
+</head>
+
+<body data-theme="dark">
+    <header class="site-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-logo" aria-hidden="true"></div>
+                <div class="brand-title">Anonimizador</div>
+            </div>
+            <nav class="nav" aria-label="Navegación principal">
+                <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Inicio</a>
+                <a href="/docs" class="{% if request.url.path.startswith('/docs') %}active{% endif %}">API</a>
+                <button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar tema">🌗</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container fade-in">
+        {% block content %}{% endblock %}
+    </main>
+
+<footer class="site-footer">
+    <div class="footer-inner">
+        <small>
+            Hecho con ❤️ usando
+            <strong>FastAPI</strong> & <strong>Pandas</strong>
+        </small>
+        <span>© {{ year }} · Curso Big Data</span>
+    </div>
+</footer>
+
+    <script>
+        (function theme() {
+            const root = document.body;
+            const key = 'theme-pref';
+            const saved = localStorage.getItem(key);
+            const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+            root.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+            document.getElementById('themeToggle')?.addEventListener('click', () => {
+                const cur = root.getAttribute('data-theme');
+                const next = cur === 'dark' ? 'light' : 'dark';
+                root.setAttribute('data-theme', next);
+                localStorage.setItem(key, next);
+            });
+        })();
+    </script>
+
+    <script src="/static/app.js"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

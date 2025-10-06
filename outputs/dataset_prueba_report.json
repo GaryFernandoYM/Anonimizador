@@ -1,0 +1,24 @@
+{
+  "original_filename": "dataset_prueba.csv",
+  "output_filename": "dataset_prueba_anon.csv",
+  "detected_pii_columns": [
+    "dni",
+    "email",
+    "nombre",
+    "telefono"
+  ],
+  "column_risk": {
+    "nombre": 0,
+    "email": 30,
+    "dni": 60,
+    "telefono": 60
+  },
+  "global_score": 37,
+  "generated_at": "2025-10-05T18:44:55.817635Z",
+  "plan": {
+    "email": "mask",
+    "dni": "hash:length=24",
+    "telefono": "mask:keep_start=0,keep_end=0",
+    "nota": "redact_text"
+  }
+}

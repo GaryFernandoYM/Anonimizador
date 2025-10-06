@@ -1,0 +1,32 @@
+{
+  "original_filename": "pacientes_salud.csv",
+  "output_filename": "pacientes_salud_anon.csv",
+  "detected_pii_columns": [
+    "apellido",
+    "centro_salud",
+    "correo",
+    "edad",
+    "nombre",
+    "telefono"
+  ],
+  "column_risk": {
+    "nombre": 0,
+    "apellido": 0,
+    "centro_salud": 0,
+    "correo": 60,
+    "telefono": 60,
+    "edad": 30
+  },
+  "global_score": 25,
+  "generated_at": "2025-10-06T03:11:52.733335Z",
+  "plan": {
+    "nombre": "pseudonym",
+    "apellido": "mask",
+    "centro_salud": "mask",
+    "diagnóstico": "mask",
+    "tratamiento": "mask",
+    "correo": "mask",
+    "telefono": "hash",
+    "edad": "bucket_age"
+  }
+}

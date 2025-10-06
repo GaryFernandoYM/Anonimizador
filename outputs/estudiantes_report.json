@@ -1,0 +1,28 @@
+{
+  "original_filename": "estudiantes.csv",
+  "output_filename": "estudiantes_anon.csv",
+  "detected_pii_columns": [
+    "apellido",
+    "carrera",
+    "correo",
+    "edad",
+    "nombre"
+  ],
+  "column_risk": {
+    "nombre": 0,
+    "apellido": 0,
+    "carrera": 0,
+    "correo": 60,
+    "edad": 30
+  },
+  "global_score": 18,
+  "generated_at": "2025-10-06T15:01:27.936547Z",
+  "plan": {
+    "nombre": "mask",
+    "apellido": "mask",
+    "carrera": "mask",
+    "nota": "redact_text",
+    "correo": "mask",
+    "edad": "bucket_age"
+  }
+}

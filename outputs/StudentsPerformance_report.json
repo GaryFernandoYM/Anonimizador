@@ -1,0 +1,16 @@
+{
+  "original_filename": "StudentsPerformance.csv",
+  "output_filename": "StudentsPerformance_anon.csv",
+  "detected_pii_columns": [],
+  "column_risk": {},
+  "global_score": 0,
+  "generated_at": "2025-10-05T20:19:14.136972Z",
+  "plan": {
+    "parental level of education": "mask",
+    "lunch": "mask",
+    "test preparation course": "mask",
+    "math score": "mask",
+    "reading score": "mask",
+    "writing score": "mask"
+  }
+}

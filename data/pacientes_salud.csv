@@ -1,0 +1,21 @@
+﻿nombre,apellido,centro_salud,diagnóstico,tratamiento,correo,telefono,edad
+María,Gutiérrez,Hospital Regional Puno,Fiebre,Paracetamol,maria.gutierrez@hospital.pe,987654321,29
+Carlos,Ramos,Clínica Andina,Hipertensión,Losartán,carlos.ramos@clinica.pe,956432187,45
+Lucía,Mamani,Centro de Salud Juliaca,Diabetes tipo II,Metformina,lucia.mamani@salud.pe,984512378,52
+Pedro,Huanca,Hospital Essalud Juliaca,Fractura de pierna,Ibuprofeno,pedro.huanca@essalud.pe,923456789,35
+Ana,Quispe,Clínica Puno,Infección respiratoria,Amoxicilina,ana.quispe@clinica.pe,987654312,27
+Roxana,Poma,Centro Médico Los Andes,Migraña,Sumatriptán,roxana.poma@losandes.pe,968742135,33
+Jorge,Ccama,Hospital Regional Puno,Gastritis,Omeprazol,jorge.ccama@hospital.pe,954123678,41
+Carla,Ticona,Hospital Essalud Juliaca,COVID-19,Dexametasona,carla.ticona@essalud.pe,987123654,36
+Luis,Apaza,Clínica San Martín,Alergia,Loratadina,luis.apaza@sanmartin.pe,975312468,24
+Verónica,Llanque,Centro de Salud Azángaro,Anemia,Sulfato ferroso,veronica.llanque@salud.pe,912345678,38
+Héctor,Choque,Hospital Regional Puno,Bronquitis,Ambroxol,hector.choque@hospital.pe,945678123,28
+Fiorella,Condori,Clínica Andina,Colesterol alto,Atorvastatina,fiorella.condori@clinica.pe,963258741,43
+Renato,Luque,Centro Médico Los Andes,Gripe,Antigripal,renato.luque@losandes.pe,954789321,31
+Sofía,Ccori,Clínica Puno,Dolor de espalda,Diclofenaco,sofia.ccori@clinica.pe,984621357,26
+Miguel,Turpo,Hospital Essalud Juliaca,Asma,Salbutamol,miguel.turpo@essalud.pe,951753842,40
+Diana,Flores,Hospital Regional Puno,Otitis,Ciprofloxacino,diana.flores@hospital.pe,998745632,33
+Oscar,Huarachi,Clínica San Martín,Sinusitis,Ibuprofeno,oscar.huarachi@sanmartin.pe,987412365,37
+Elena,Pérez,Centro de Salud Juliaca,Dermatitis,Clobetazol,elena.perez@salud.pe,934125768,42
+José,Layme,Clínica Puno,Gripe,Paracetamol,jose.layme@clinica.pe,987654123,25
+Natalia,Quispe,Hospital Regional Puno,Hipotiroidismo,Levotiroxina,natalia.quispe@hospital.pe,956741283,47

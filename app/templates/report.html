@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- =========================
+      RESUMEN DEL REPORTE
+========================= -->
+<section class="card">
+  <div class="flex-row">
+    <h2 class="m0">Reporte de evaluación</h2>
+    <div class="badge">Generado {{ year }}</div>
+  </div>
+
+  <div class="grid-cards mt">
+    <div class="info-cell">
+      <div class="muted small">PII detectada</div>
+      <div class="mt-xs">
+        {% if report.detected_pii_columns and report.detected_pii_columns|length > 0 %}
+          {% for c in report.detected_pii_columns %}
+            <span class="badge mr-xs">{{ c }}</span>
+          {% endfor %}
+        {% else %}
+          <span class="badge">Ninguna</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% set risk_class = 'risk-low' if report.global_score < 35 else ('risk-med' if report.global_score < 70 else 'risk-high') %}
+    <div class="info-cell">
+      <div class="muted small">Riesgo global</div>
+      <div class="mt flex-row">
+        <strong class="score-big">{{ report.global_score }}/100</strong>
+        <div class="bar-outer">
+          <!-- ✅ Sin CSS inline con Jinja. Usamos data-width y clase -->
+          <div class="bar-inner {{ risk_class }}" data-width="{{ report.global_score }}"></div>
+        </div>
+      </div>
+      <div class="muted small mt-xs">
+        {% if report.global_score < 35 %}Bajo{% elif report.global_score < 70 %}Medio{% else %}Alto{% endif %} riesgo estimado
+      </div>
+    </div>
+  </div>
+
+  {% if report.notes %}
+    <p class="mt small muted"><em>{{ report.notes }}</em></p>
+  {% endif %}
+</section>
+
+<!-- =========================
+      DETALLE POR COLUMNA
+========================= -->
+<section class="card">
+  <div class="flex-row">
+    <h3 class="m0">Riesgo por columna</h3>
+    <div class="badge">Total columnas: {{ report.column_risk|length }}</div>
+  </div>
+
+  {% if report.column_risk and report.column_risk|length > 0 %}
+    <div class="table-wrapper">
+      <table id="riskTable">
+        <thead>
+          <tr>
+            <th>Columna</th>
+            <th>Puntaje</th>
+            <th>Nivel</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for col, score in report.column_risk.items() %}
+          {% set lvl = 'Bajo' if score < 35 else ('Medio' if score < 70 else 'Alto') %}
+          {% set lvl_class = 'risk-low' if score < 35 else ('risk-med' if score < 70 else 'risk-high') %}
+          <tr>
+            <td>{{ col }}</td>
+            <td>
+              <div class="row-center">
+                <span class="w-34 text-right">{{ score }}</span>
+                <div class="bar-outer">
+                  <!-- ✅ Sin style inline: data-width + clase -->
+                  <div class="bar-inner {{ lvl_class }}" data-width="{{ score }}"></div>
+                </div>
+              </div>
+            </td>
+            <td><span class="chip {{ lvl_class }}">{{ lvl }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="mt">No hay métricas por columna para mostrar.</p>
+  {% endif %}
+</section>
+
+<!-- =========================
+      PREVISUALIZACIÓN
+========================= -->
+<section class="card">
+  <div class="flex-row">
+    <h2 class="m0">Previsualización del archivo anonimizado</h2>
+  </div>
+
+  {% if preview_columns and preview_rows %}
+    <p class="muted mt-xs">Mostrando las primeras {{ preview_rows|length }} filas.</p>
+    <div class="table-wrapper">
+      <table id="previewTable">
+        <thead>
+          <tr>
+            {% for c in preview_columns %}
+              <th title="{{ c }}">{{ c }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in preview_rows %}
+            <tr>
+              {% for c in preview_columns %}
+                <td>{{ row[c] if c in row else "" }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="mt">No se pudo generar la previsualización del archivo.</p>
+  {% endif %}
+
+  <div class="mt btn-row">
+    <a class="button" href="/download/{{ output_name }}">⬇️ Descargar</a>
+    <a class="button secondary" href="/">Volver</a>
+  </div>
+</section>
+
+<!-- =========================
+      JS: aplicar width y ordenar
+========================= -->
+<script>
+  // Aplica width desde data-width (evita CSS con Jinja en línea)
+  document.querySelectorAll('.bar-inner[data-width]').forEach(el => {
+    const v = Number(el.getAttribute('data-width'));
+    const pct = isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
+    el.style.width = pct + '%';
+  });
+
+  // Orden básico de tablas
+  function makeSortable(tableId) {
+    const t = document.getElementById(tableId);
+    if (!t) return;
+    const ths = t.querySelectorAll("thead th");
+    ths.forEach((th, idx) => {
+      th.style.cursor = "pointer";
+      th.addEventListener("click", () => {
+        const tbody = t.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        const asc = th.getAttribute("data-asc") !== "true";
+        rows.sort((a, b) => {
+          const A = a.children[idx]?.innerText?.trim() ?? "";
+          const B = b.children[idx]?.innerText?.trim() ?? "";
+          const aNum = parseFloat(A.replace(",", "."));
+          const bNum = parseFloat(B.replace(",", "."));
+          const bothNum = !isNaN(aNum) && !isNaN(bNum);
+          if (bothNum) return asc ? (aNum - bNum) : (bNum - aNum);
+          return asc ? A.localeCompare(B) : B.localeCompare(A);
+        });
+        tbody.innerHTML = "";
+        rows.forEach(r => tbody.appendChild(r));
+        ths.forEach(h => h.removeAttribute("data-asc"));
+        th.setAttribute("data-asc", asc ? "true" : "false");
+      });
+    });
+  }
+  makeSortable("riskTable");
+  makeSortable("previewTable");
+</script>
+
+{% endblock %}
