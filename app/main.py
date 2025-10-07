@@ -1,13 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, Request
+# app/main.py
+from fastapi import FastAPI, UploadFile, File, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-import pandas as pd
 from datetime import datetime
+import pandas as pd
 import json
+import traceback
 
-from app.config import DATA_DIR, OUTPUTS_DIR
+from app.config import (
+    DATA_DIR, OUTPUTS_DIR,
+    is_allowed_filetype, file_size_ok, MAX_FILE_MB
+)
 from app.schemas import AnonymizeRequest, Report
 from app.utils.file_io import load_dataset, save_dataset, safe_filename
 from app.services.detectors import detect_pii_columns, count_hits
@@ -17,8 +22,9 @@ from app.utils.scoring import risk_score_by_column, global_risk_score
 app = FastAPI(title="Anonimizador FastAPI (Robusto)")
 
 # Static & templates
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+BASE_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -29,51 +35,67 @@ def index(request: Request):
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    fname = safe_filename(file.filename)
-    dest = DATA_DIR / fname
-    with open(dest, "wb") as f:
-        f.write(await file.read())
+    try:
+        # 1) Validar extensión
+        if not is_allowed_filetype(file.filename):
+            raise HTTPException(status_code=400, detail="Tipo de archivo no permitido")
 
-    df = load_dataset(dest)
-    head_records = df.head(10).to_dict(orient="records")
-    return JSONResponse({
-        "filename": fname,
-        "columns": list(df.columns),
-        "head": head_records
-    })
+        # 2) Guardar temporalmente
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        dest = DATA_DIR / safe_filename(file.filename)
+        with dest.open("wb") as f:
+            f.write(await file.read())
 
-def _suggest_strategy(col: str) -> str:
-    lc = col.lower()
-    if any(k in lc for k in ["mail", "correo", "@", "email", "e-mail"]):
+        # 3) Validar tamaño
+        if not file_size_ok(dest):
+            dest.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail=f"Archivo > {MAX_FILE_MB} MB")
+
+        # 4) Leer muestra
+        ext = dest.suffix.lower()
+        if ext in [".csv", ".tsv", ".txt"]:
+            sep = "\t" if ext == ".tsv" else ","
+            df = pd.read_csv(dest, sep=sep, nrows=500)
+        elif ext in [".xlsx", ".xlsm", ".xls"]:
+            df = pd.read_excel(dest, nrows=500)
+        elif ext == ".parquet":
+            df = pd.read_parquet(dest)
+        elif ext in [".jsonl", ".json"]:
+            try:
+                df = pd.read_json(dest, lines=True)
+            except ValueError:
+                df = pd.read_json(dest)
+        else:
+            raise HTTPException(status_code=400, detail="Extensión no soportada")
+
+        cols = [str(c) for c in df.columns.tolist()]
+        head = df.head(10).fillna("").astype(str).to_dict(orient="records")
+        return JSONResponse({"filename": dest.name, "columns": cols, "head": head})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("ERROR /upload:", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Error interno al procesar el archivo")
+
+# --- sugeridor muy simple para no romper el front ---
+def _suggest_strategy(col_name: str) -> str:
+    lc = str(col_name).lower()
+    if any(k in lc for k in ["mail", "correo", "email"]):
         return "mask"
-    if any(k in lc for k in ["tel", "cel", "phone", "movil", "móvil"]):
-        return "mask:keep_start=0,keep_end=0"
-    if "dni" in lc:
-        return "hash:length=24"
-    if "ruc" in lc:
-        return "pseudonym:prefix=RUC_"
-    if any(k in lc for k in ["fecha", "nacimiento", "dob", "date", "fec_"]):
+    if any(k in lc for k in ["tel", "phone", "cel"]):
+        return "mask"
+    if any(k in lc for k in ["dni", "documento", "ruc", "passport", "pasaporte"]):
+        return "hash:length=16"
+    if any(k in lc for k in ["fecha", "date", "nacimiento", "dob"]):
         return "generalize_date:granularity=year"
-    if any(k in lc for k in ["direccion", "address", "domicilio", "ubicacion", "ubigeo", "ubicación"]):
+    if any(k in lc for k in ["lat", "long", "coord", "ubicacion", "address", "direccion"]):
         return "generalize_geo:levels=2"
-    if any(k in lc for k in ["monto", "ingreso", "salario", "precio", "valor", "importe"]):
-        return "bucket_numeric:size=100"
-    if "edad" in lc:
-        return "bucket_age"
-    # Texto libre potencialmente sensible
-    if any(k in lc for k in ["observacion", "observación", "nota", "comentario", "descripcion", "descripción"]):
-        return "redact_text"
-    return "mask"
+    return ""  # ignorar por defecto
 
 @app.post("/api/analyze")
-async def analyze(filename: str = None):
-    """
-    Analiza un archivo previamente subido (guardado en /data) y devuelve:
-      - columnas
-      - columnas con PII detectada
-      - sugerencias de estrategia por columna
-    Enviar filename como query param o en el body (form/json).
-    """
+async def analyze(filename: str | None = None):
     if not filename:
         return JSONResponse({"error": "Falta 'filename' en query/body."}, status_code=400)
 
@@ -94,19 +116,13 @@ async def analyze(filename: str = None):
 
 @app.post("/anonymize/{filename}")
 async def anonymize(filename: str, req: AnonymizeRequest):
-    """
-    Aplica el plan de anonimización recibido en 'req.strategies' y genera:
-      - archivo anonimizado en /outputs
-      - JSON de reporte en /outputs/<base>_report.json
-      - URL de reporte HTML
-    """
     src = DATA_DIR / filename
     if not src.exists():
         return JSONResponse({"error": "Archivo no encontrado."}, status_code=404)
 
     df = load_dataset(src)
 
-    # Detección PII previa (para reporte)
+    # Métricas PII previas
     detected = detect_pii_columns(df)
     pii_hits = {col: count_hits(df, col) for col in df.columns if col in detected}
     per_col_score = risk_score_by_column(pii_hits)
@@ -120,7 +136,7 @@ async def anonymize(filename: str, req: AnonymizeRequest):
     out_path = OUTPUTS_DIR / out_name
     save_dataset(out_df, out_path)
 
-    # Persistir reporte JSON
+    # Guardar reporte JSON
     report_json = {
         "original_filename": filename,
         "output_filename": out_name,
@@ -131,29 +147,22 @@ async def anonymize(filename: str, req: AnonymizeRequest):
         "plan": plan
     }
     (OUTPUTS_DIR / f"{Path(filename).stem}_report.json").write_text(
-        json.dumps(report_json, ensure_ascii=False, indent=2),
-        encoding="utf-8"
+        json.dumps(report_json, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     return JSONResponse({"report_url": f"/report/{out_name}"})
 
 @app.get("/report/{output_name}", response_class=HTMLResponse)
 def report_view(request: Request, output_name: str):
-    """
-    Renderiza el reporte HTML y muestra una previsualización (primeras filas)
-    del archivo anonimizado antes de descargar.
-    """
     out_path = OUTPUTS_DIR / output_name
     if not out_path.exists():
         return RedirectResponse(url="/")
 
-    # Intentar cargar el JSON asociado (si se generó en /anonymize)
     base = Path(output_name).stem.replace("_anon", "")
     json_path = OUTPUTS_DIR / f"{base}_report.json"
 
     if json_path.exists():
-        with open(json_path, "r", encoding="utf-8") as f:
-            js = json.load(f)
+        js = json.loads(json_path.read_text(encoding="utf-8"))
         report = Report(
             detected_pii_columns=js.get("detected_pii_columns", []),
             column_risk=js.get("column_risk", {}),
@@ -161,42 +170,28 @@ def report_view(request: Request, output_name: str):
             notes=f"Archivo original: {js.get('original_filename')} • Plan aplicado: {js.get('plan')}"
         )
     else:
-        report = Report(
-            detected_pii_columns=[],
-            column_risk={},
-            global_score=5,
-            notes="No se halló el JSON de reporte; mostrando versión básica."
-        )
+        report = Report(detected_pii_columns=[], column_risk={}, global_score=5,
+                        notes="No se halló el JSON de reporte; mostrando versión básica.")
 
-    # Cargar el archivo anonimizado y preparar previsualización
     try:
-        from app.utils.file_io import load_dataset
         df_preview = load_dataset(out_path)
         preview_columns = list(df_preview.columns)
-        preview_rows = df_preview.head(20).to_dict(orient="records")  # Muestra hasta 20 filas
+        preview_rows = df_preview.head(20).to_dict(orient="records")
     except Exception:
         preview_columns, preview_rows = [], []
 
     return templates.TemplateResponse(
         "report.html",
-        {
-            "request": request,
-            "title": "Reporte",
-            "report": report,
-            "output_name": output_name,
-            "preview_columns": preview_columns,
-            "preview_rows": preview_rows,
-            "year": datetime.now().year
-        }
+        {"request": request, "title": "Reporte", "report": report,
+         "output_name": output_name, "preview_columns": preview_columns,
+         "preview_rows": preview_rows, "year": datetime.now().year}
     )
 
 @app.get("/download/{output_name}")
 def download(output_name: str):
-    """
-    Descarga el archivo anonimizado desde /outputs.
-    """
     path = OUTPUTS_DIR / output_name
     if not path.exists():
         return JSONResponse({"error": "Archivo no encontrado."}, status_code=404)
-    media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if path.suffix.lower() in [".xlsx"] else "text/csv"
+    media = ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+             if path.suffix.lower() == ".xlsx" else "text/csv")
     return FileResponse(path, filename=output_name, media_type=media)
